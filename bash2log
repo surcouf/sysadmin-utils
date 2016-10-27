@@ -1,0 +1,63 @@
+#!/bin/bash
+
+verbose=1
+debug=0
+facility=user
+
+LOGGER="/bin/logger -t ${0##*/}"
+
+print_log () {
+    local msg=$@
+
+	terminal=$(tty)
+	case "${terminal}" in
+		/dev/tty*|/dev/pts/*)
+			# in a terminal, add --stderr option
+			LOGGER="${LOGGER} --stderr"
+		;; 
+		*)
+			# not a terminal
+		;;
+	esac
+
+    if [[ -f "${msg}" ]]; then
+        case "${verbose}" in
+            1) cat ${msg} 1>&2          ;&
+            0) ${LOGGER} -f "${msg}"    ;;
+        esac
+    else
+        case "${verbose}" in
+            1) printf "%s\n" "${msg}"   ;&
+            0) ${LOGGER} "${msg}"       ;;
+        esac
+    fi
+}
+
+cmd() {
+    declare -a command=($@)
+    local output=$(${command[*]} 2>&1)
+    local rc=$?
+
+    case "${debug}" in
+        1)  level=debug ;;
+        *)  level=info  ;;
+    esac
+    #trap 'logger -i -t $($BASH_COMMAND) -p ${facility}.err $output' ERR
+
+    if [[ -n "${output}" ]]; then
+        case "${rc}" in
+            0) 
+                case "${verbose}" in
+                    1)
+                        echo "${command[0]}: ${output}"
+                    ;;
+                esac
+            ;;
+            *)
+                logger -si -t "${command[0]}" -p ${facility}.${level} "${output}" 
+            ;;
+        esac
+    fi
+}
+
+cmd $@
